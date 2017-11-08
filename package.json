@@ -30,7 +30,7 @@
   "scripts": {
     "build": "scripts/build.sh",
     "watch": "chokidar src scripts --initial --silent -i 'src/excmds_{background,content}.ts' -i 'src/static/docs' -c 'npm run build'",
-    "clean": "rm -rf build generated",
+    "clean": "rm -rf build generated src/grammars/*.ts",
     "test": "npm run build && jest --silent",
     "update-buildsystem": "rm -rf src/node_modules; npm run clean"
   },

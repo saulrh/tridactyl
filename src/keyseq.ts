@@ -38,6 +38,7 @@ export class MinimalKey {
 
     /** Does this key match a given MinimalKey extending object? */
     match(keyevent) {
+        // 'in' doesn't include prototypes, so it's safe for this object.
         for (let attr in this) {
             if (this[attr] !== keyevent[attr]) return false
         }
@@ -45,11 +46,31 @@ export class MinimalKey {
     }
 }
 
+/** Expand special key aliases that Vim provides to canonical values
+
+    Vim aliases are case insensitive.
+*/
+function expandAliases(key: string) {
+    // Vim compatibility aliases
+    const aliases = {
+        cr: 'Enter',
+        return: 'Enter',
+        enter: 'Enter',
+        space: ' ',
+        bar: '|',
+        del: 'Delete',
+        bs: 'Backspace',
+        lt: '<',
+    }
+    if (key.toLowerCase() in aliases) return aliases[key.toLowerCase()]
+    else return key
+}
+
 /** String starting with a bracket expr or a literal < to MinimalKey and remainder.
 
     Bracket expressions generally start with a < contain no angle brackets or
     whitespace and end with a >. These special-cased expressions are also
-    permitted: <{optional modifier}<> or <{optional modifier}>>
+    permitted: <{modifier}<> or <{modifier}>>
 
     If the string passed does not match this definition, it is treated as a
     literal <.
@@ -62,15 +83,8 @@ export class MinimalKey {
 
     Modifiers are case insensitive.
 
-    The following case insensitive vim compatibility aliases are also defined:
-
-        cr: 'Enter',
-        return: 'Enter',
-        space: 'Enter',
-        bar: '|',
-        del: 'Delete',
-        bs: 'Backspace',
-        lt: '<',
+    Some case insensitive vim compatibility aliases are also defined, see
+    [[expandAliases]].
 
     Compatibility breaks:
 
@@ -95,6 +109,10 @@ export class MinimalKey {
     [1]: https://developer.mozilla.org/en-US/docs/Web/API/KeyboardEvent/key/Key_Values
 
 */
+
+// OLD IMPLEMENTATION! See below for a simpler-looking one powered by nearley.
+// It's probably slower, but it supports multiple modifiers and will be easier
+// to understand and extend.
 export function bracketexprToKey(be: string): [MinimalKey, string] {
 
     function extractModifiers(be: string): [string, any] {
@@ -129,16 +147,6 @@ export function bracketexprToKey(be: string): [MinimalKey, string] {
     // General case:
     const beRegex = /<[^\s]+?>/u
 
-    // Vim compatibility aliases
-    const aliases = {
-        cr: 'Enter',
-        return: 'Enter',
-        space: 'Enter',
-        bar: '|',
-        del: 'Delete',
-        bs: 'Backspace',
-        lt: '<',
-    }
     if (beRegex.exec(be) !== null) {
         // Extract complete bracket expression and remove
         let bracketedBit = beRegex.exec(be)[0]
@@ -146,13 +154,33 @@ export function bracketexprToKey(be: string): [MinimalKey, string] {
 
         // Extract key and alias if required
         let key = beRegex.exec(beWithoutModifiers)[0].slice(1, -1)
-        if (key.toLowerCase() in aliases) key = aliases[key.toLowerCase()]
+        key = expandAliases(key)
 
         // Return constructed key and remainder of the string
         return [new MinimalKey(key, modifiers), be]
     } else {
         // Wasn't a bracket expression. Treat it as a literal <
         return [new MinimalKey('<'), be.slice(1)]
+    }
+}
+
+import {Parser} from './nearley_utils'
+import * as bracketexpr_grammar from './grammars/bracketexpr'
+
+const bracketexpr_parser = new Parser(bracketexpr_grammar)
+
+export function bracketexprToKey2(inputStr) {
+    if (inputStr.indexOf('>') > 0) {
+        try {
+            const [[modifiers, key], remainder] = bracketexpr_parser.feedUntilError(inputStr)
+            return [new MinimalKey(expandAliases(key), modifiers), remainder]
+        } catch (e) {
+            // No valid bracketExpr
+            return [new MinimalKey('<'), inputStr.slice(1)]
+        }
+    } else {
+        // No end bracket to match == no valid bracketExpr
+        return [new MinimalKey('<'), inputStr.slice(1)]
     }
 }
 
