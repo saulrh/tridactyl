@@ -66,7 +66,7 @@ export function hintPage(
 function* hintnames(hintchars = HINTCHARS): IterableIterator<string> {
     let taglen = 1
     while (true) {
-        yield* map(permutationsWithReplacement(hintchars, taglen), e=>e.join(''))
+        yield* map(permutationsWithReplacement(hintchars, taglen), e=>e.reverse().join(''))
         taglen++
     }
 }
@@ -80,7 +80,7 @@ function* hintnames_uniform(n: number, hintchars = HINTCHARS): IterableIterator<
         const taglen = Math.ceil(log(n, hintchars.length))
         // And return first n permutations
         yield* map(islice(permutationsWithReplacement(hintchars, taglen), n),
-            perm => perm.join(''))
+            perm => perm.reverse().join(''))
     }
 }
 
