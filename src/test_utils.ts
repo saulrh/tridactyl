@@ -51,3 +51,7 @@ export function testAllNoError(toTest, testcases) {
             expect(()=>toTest(...args)).not.toThrow())
     }
 }
+
+export function testAllObject(toTest, testcases) {
+    testAllCustom(toTest, testcases, 'toMatchObject', 'ans')
+}
