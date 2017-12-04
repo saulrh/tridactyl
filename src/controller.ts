@@ -92,10 +92,14 @@ export function acceptExCmd(ex_str: string) {
         } catch (e) {
             // Errors from func are caught here (e.g. no next tab)
             console.error(e)
+            let [func, args] = exmode_parser("errorshow " + e)
+            func(...args)
         }
     } catch (e) {
         // Errors from parser caught here
         console.error(e)
+        let [func, args] = exmode_parser("errorshow " + e)
+        func(...args)
     }
 }
 

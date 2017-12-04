@@ -849,6 +849,11 @@ export function fillcmdline_notrail(...strarr: string[]) {
     messageActiveTab("commandline_frame", "fillcmdline", [str, trailspace])
 }
 
+/** Show an error message */
+//#background
+export function errorshow(...strarr: string[]){
+    fillcmdline_notrail("ERROR: ", ...strarr)
+}
 /** Equivalent to `fillcmdline_notrail <yourargs><current URL>`
 
     See also [[fillcmdline_notrail]]
