@@ -52,9 +52,9 @@ export function hintPage(
     state.mode = 'hint'
     modeState = new HintState()
     for (let [el, name] of izip( hintableElements, names)) {
-        console.log({el, name})
-        modeState.hintchars += name
-        modeState.hints.push(new Hint(el, name, onSelect))
+		let nhint = new HintFilteredTargetText(el, name, onSelect)
+        modeState.hintchars += nhint.filter_chars
+        modeState.hints.push(nhint)
     }
 
     if (modeState.hints.length) {
@@ -107,16 +107,14 @@ function* hintnames_uniform(n: number, hintchars = config.get("hintchars")): Ite
 type HintSelectedCallback = (Hint) => any
 
 /** Place a flag by each hintworthy element */
-class Hint {
-    private readonly flag = document.createElement('span')
+abstract class Hint {
+    protected readonly flag = document.createElement('span')
 
     constructor(
-        private readonly target: Element,
-        public readonly name: string,
-        private readonly onSelect: HintSelectedCallback
+        protected readonly target: Element,
+        protected readonly onSelect: HintSelectedCallback
     ) {
         const rect = target.getClientRects()[0]
-        this.flag.textContent = name
         this.flag.className = 'TridactylHint'
         /* this.flag.style.cssText = ` */
         /*     top: ${rect.top}px; */
@@ -154,6 +152,85 @@ class Hint {
     select() {
         this.onSelect(this)
     }
+
+	abstract in_filter(filter_string: string): boolean;
+	abstract get filter_chars(): string;
+}
+
+class HintFilteredTargetText extends Hint {
+    constructor(
+        protected readonly target: Element,
+		readonly name: string,
+        protected readonly onSelect: HintSelectedCallback
+    ) {
+		super(target, onSelect)
+        this.flag.textContent = name
+        // console.log({this.target, this.name})
+    }
+
+	protected get filterable_string(): string {
+		let nodename = this.target.nodeName.toLowerCase()
+		if (nodename == 'input') {
+			// } else if (nodename == 'a'
+			// 		   && !el.textContent.trim()
+			// 		   && el.firstElementChild
+			// 		   && el.firstElementChild.nodeName.toLowerCase() == 'img') {
+			// 	return el.firstElementChild.alt || el.firstElementChild.title
+		} else if (0 < this.target.textContent.length) {
+			return this.target.textContent.toLowerCase()
+		} else if (this.target.hasAttribute('title')) {
+			return this.target.getAttribute('title').toLowerCase()
+		} else {
+			return this.target.innerHTML.toLowerCase()
+		}
+	}
+
+	get filter_chars(): string {
+		return this.name + this.filterable_string
+	}
+
+	in_filter(filter_string: string): boolean {
+		return this.in_name(filter_string) && this.in_filterable_string(filter_string)
+	}
+
+	protected in_name(filter_string: string): boolean {
+		// FIXME: will break on ] and similar regex control characters
+		let filter_string_name = filter_string.replace(new RegExp('[^' + this.name + ']', 'gi'), '')
+		return this.name.startsWith(filter_string_name)
+	}
+
+	protected in_filterable_string(filter_string: string): boolean {
+		let cur_idx = 0
+		// FIXME: will break on ] and similar regex control characters
+		// FIXME: need to pull the full list of configured filter characters
+		let filter_string_non_name = filter_string.replace(new RegExp('[' + this.name + ']', 'gi'), '')
+		for (let c of filter_string_non_name) {
+			cur_idx = this.filterable_string.indexOf(c.toLowerCase(), cur_idx)
+			if (-1 == cur_idx) {
+				return false
+			}
+		}
+		return true
+	}
+}
+
+class HintLiteralNames extends Hint {
+	constructor (
+		protected readonly target: Element,
+		readonly name: string,
+		protected readonly onSelect: HintSelectedCallback
+	) {
+		super(target, onSelect)
+		this.flag.textContent = name
+	}
+
+	get filter_chars(): string {
+		return this.name
+	}
+
+	in_filter(filter_string: string): boolean {
+		return this.name.startsWith(filter_string)
+	}
 }
 
 /** Show only hints prefixed by fstr. Focus first match */
@@ -161,7 +238,7 @@ function filter(fstr) {
     const active: Hint[] = []
     let foundMatch
     for (let h of modeState.hints) {
-        if (!h.name.startsWith(fstr)) h.hidden = true
+        if (!h.in_filter(fstr)) h.hidden = true
         else {
             if (! foundMatch) {
                 h.focused = true
